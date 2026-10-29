@@ -58,7 +58,7 @@ FLAC files. It remembers where you are in every book, on both devices.
 | `Shared/` | Compiled into both apps: `Player` (AVPlayer engine: speed, chapters, sleep timer, interruptions), `NowPlaying` + `RemoteCommands`, `AudioSession`, `Audiobook` + `LibraryScanner`, `CoverStore` + `CoverView` (cover cache, shown everywhere), `Settings`, `SyncMessages` |
 | `App/` | iPhone app: `LibraryStore` (+ Inbox watcher and background import in `InboxAutomation.swift`), `LibraryView`, `PlayerView`, `CoverPicker` (Photos/Files cover menu), `RoutePickerButton`, `WatchLink` (phone side of WatchConnectivity) |
 | `Watch/` | Watch app: `WatchLibrary`, `WatchLink` (receives books), `WatchRootView`, `WatchPlayerView` |
-| `scripts/` | `make-icon.swift` (the icon), `install-iphone.sh`, `run-simulators.sh`, `bump-build.sh` |
+| `scripts/` | `make-icon.swift` (the icon), `install-iphone.sh`, `run-simulators.sh`, `bump-build.sh`, `release.sh` (GitHub release with a development-signed IPA) |
 | `project.yml` | XcodeGen spec → `Audiobug.xcodeproj` (schemes `Audiobug`, `AudiobugWatch`) |
 
 ## Build & run
