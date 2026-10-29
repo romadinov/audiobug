@@ -1,0 +1,11 @@
+build/
+build-sim/
+build-release/
+*.xcodeproj
+.DS_Store
+.build/
+Packages/AudiobugCore/.build/
+*.xcuserstate
+xcuserdata/
+build-sim-watch/
+*.xcresult
