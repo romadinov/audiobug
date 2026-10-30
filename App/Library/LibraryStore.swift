@@ -43,6 +43,19 @@ final class LibraryStore {
     init() {
         reload()
         Task { await resolveInbox() }
+        UploadServer.shared.librarySnapshot = { [weak self] in
+            guard let self else { return UploadLibrarySnapshot(folders: [], books: []) }
+            let folders = Array(Set(books.map(\.folder))).filter { !$0.isEmpty }.sorted()
+            return UploadLibrarySnapshot(folders: folders, books: books.map { .init(title: $0.title, folder: $0.folder, size: $0.fileSize) })
+        }
+        UploadServer.shared.existingTitle = { [weak self] id in self?.books.first { $0.id == id }?.title }
+        UploadServer.shared.onImported = { [weak self] url in self?.uploaded(url) }
+    }
+
+    /// A file arrived through the Wi-Fi upload server: it is already in Documents/Books.
+    private func uploaded(_ url: URL) {
+        reload()
+        if let inbox { Task.detached(priority: .utility) { _ = try? inbox.mirrorFolders() } }   // a new folder gets its Inbox twin
     }
 
     func reload() {

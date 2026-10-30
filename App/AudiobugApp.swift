@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         WatchLink.shared.activate()        // so background launches (Watch positions, transfer completions) are received
         if DeveloperBuild.isDeveloper { CrashReporter.shared.start() }
         #if DEBUG
+        // AUDIOBUG_UPLOAD_AUTOSTART=1: switch the Wi-Fi upload server on at launch (simulator testing with curl).
+        if ProcessInfo.processInfo.environment["AUDIOBUG_UPLOAD_AUTOSTART"] != nil { UploadServer.shared.start() }
         // AUDIOBUG_FEEDBACK_SELFTEST=1 AUDIOBUG_FEEDBACK_DIR=<dir>: write a sample note there (checks the format).
         if ProcessInfo.processInfo.environment["AUDIOBUG_FEEDBACK_SELFTEST"] != nil {
             Task.detached {
@@ -38,6 +40,7 @@ struct AudiobugApp: App {
                 .environment(player)
                 .environment(watch)
                 .environment(Settings.shared)
+                .environment(UploadServer.shared)
                 .onAppear { wire() }
                 .onOpenURL { url in
                     // "Open in Audiobug" from Files, Mail, AirDrop…

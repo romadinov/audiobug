@@ -6,8 +6,10 @@ struct LibraryView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(Player.self) private var player
     @Environment(WatchLink.self) private var watch
+    @Environment(UploadServer.self) private var uploadServer
     @State private var showImporter = false
     @State private var showSettings = false
+    @State private var showUpload = false
     @State private var inboxReport: InboxSync.Report?
     @State private var pendingDelete: Audiobook?
     @State private var coverRequest: CoverRequest?
@@ -41,6 +43,7 @@ struct LibraryView: View {
             if case .success(let urls) = result { library.importFiles(urls) }
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showUpload) { UploadServerView() }
         .sheet(item: $improvementNote) { ImprovementNoteView(request: $0) }
         .alert("Inbox synced", isPresented: Binding(get: { inboxReport != nil }, set: { if !$0 { inboxReport = nil } }),
                presenting: inboxReport) { _ in
@@ -66,6 +69,9 @@ struct LibraryView: View {
 
     private var list: some View {
         List {
+            if uploadServer.isRunning {
+                Section { UploadServerBanner { showUpload = true } }
+            }
             if !library.autoImported.isEmpty {
                 Section {
                     HStack(alignment: .top) {
@@ -124,6 +130,7 @@ struct LibraryView: View {
                 Task { if let report = await library.syncInbox() { inboxReport = report } }
             }
             .disabled(library.isSyncingInbox)
+            Button(uploadServer.isRunning ? "Wi-Fi Upload (on)…" : "Wi-Fi Upload…", systemImage: "wifi") { showUpload = true }
             Button("Settings", systemImage: "gear") { showSettings = true }
             if DeveloperBuild.isDeveloper {
                 Button("Suggest an Improvement…", systemImage: "lightbulb") {
@@ -143,10 +150,11 @@ struct LibraryView: View {
         ContentUnavailableView {
             Label("No audiobooks yet", systemImage: "headphones")
         } description: {
-            Text("Tap + to pick M4B, M4A or MP3 files, open a book from Files or AirDrop, or drop books into \(library.inboxLocation.isEmpty ? "the Inbox" : library.inboxLocation) — they're imported automatically.")
+            Text("Tap + to pick M4B, M4A or MP3 files, open a book from Files or AirDrop, upload from a computer over Wi-Fi, or drop books into \(library.inboxLocation.isEmpty ? "the Inbox" : library.inboxLocation) — they're imported automatically.")
         } actions: {
             Button("Add Books") { showImporter = true }.buttonStyle(.borderedProminent)
             Button("Sync iCloud Inbox") { Task { if let report = await library.syncInbox() { inboxReport = report } } }
+            Button("Upload over Wi-Fi") { showUpload = true }
         }
     }
 

@@ -141,4 +141,56 @@ final class AudiobugFlowTests: XCTestCase {
         let done = app.images["row.onWatch"]
         XCTAssertTrue(done.waitForExistence(timeout: 240), "transfer did not finish")
     }
+
+    /// Switches the Wi-Fi upload server on from the ⋯ menu, reads its address and talks to it over HTTP.
+    func testWiFiUpload() throws {
+        let app = XCUIApplication()
+        app.launch()
+        let more = app.buttons["More"]
+        waitFor(more)
+        more.tap()
+        let item = app.buttons["Wi-Fi Upload…"]
+        waitFor(item, 5)
+        item.tap()
+        let toggle = app.switches["upload.toggle"]
+        waitFor(toggle)
+        let knob = toggle.switches.firstMatch   // SwiftUI Toggle: the tap must land on the inner switch
+        (knob.exists ? knob : toggle).tap()
+        let address = app.staticTexts["upload.url"].firstMatch
+        waitFor(address, 10)
+        let base = address.label
+        XCTAssertTrue(base.hasPrefix("http://"), base)
+
+        // The page is served, a non-audiobook upload is refused and nothing is left behind.
+        let page = request(base + "/", method: "GET", body: nil)
+        XCTAssertEqual(page.status, 200)
+        XCTAssertTrue(page.text.contains("<title>Audiobug</title>"))
+        let refused = request(base + "/upload/notes.txt", method: "PUT", body: Data("hello".utf8))
+        XCTAssertEqual(refused.status, 415, refused.text)
+        let library = request(base + "/api/library", method: "GET", body: nil)
+        XCTAssertEqual(library.status, 200)
+        XCTAssertTrue(library.text.contains("\"books\""), library.text)
+
+        app.buttons["Done"].tap()
+        let banner = app.buttons["upload.banner"]
+        waitFor(banner, 5)
+        app.buttons["Stop"].tap()
+        XCTAssertTrue(banner.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(request(base + "/", method: "GET", body: nil).status, 0, "server still answering after Stop")
+    }
+
+    private func request(_ url: String, method: String, body: Data?) -> (status: Int, text: String) {
+        var req = URLRequest(url: URL(string: url)!)
+        req.httpMethod = method
+        req.httpBody = body
+        req.timeoutInterval = 10
+        var result = (status: 0, text: "")
+        let done = expectation(description: url)
+        URLSession.shared.dataTask(with: req) { data, response, _ in
+            result = ((response as? HTTPURLResponse)?.statusCode ?? 0, String(decoding: data ?? Data(), as: UTF8.self))
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 15)
+        return result
+    }
 }

@@ -25,6 +25,14 @@ FLAC files. It remembers where you are in every book, on both devices.
   player (or the Watch's More sheet) and say what's wrong: the note is saved to *iCloud Drive › Audiobug › Improvement
   notes.md* with the book, chapter and time, and routed to ebooker, which made the book. The library's ⋯ menu has the
   same for the app itself; crash reports land in *Crash reports*.
+- **Wi-Fi Upload.** ⋯ › **Wi-Fi Upload…** switches on a small web server in the app (port 8080 when free). Open the
+  address it shows — `http://192.168.x.x:8080` — in a browser on a Mac, PC or any device on the same Wi-Fi and drop
+  M4B, M4A or MP3 files on the page, into a folder of the library if you like; each file appears in the library as soon
+  as it has arrived. A terminal works too: `curl -T Book.m4b "http://192.168.x.x:8080/upload/Book.m4b?folder=Fiction"`.
+  A book you already have (same contents, any name) is refused rather than duplicated. The screen stays on while the
+  server runs; keep the app in front, because iOS suspends it — and the server — soon after it leaves the screen unless
+  a book is playing. Nothing is advertised on the network and no local-network permission is needed: the server only
+  listens.
 - **Positions.** Saved every 5 s while playing, on pause and when the app goes to the background. A finished book
   starts over when played again.
 - **iCloud Inbox.** *iCloud Drive › Audiobug › Inbox* mirrors the library's folders (the same scheme as Scriptorium's
@@ -56,7 +64,7 @@ FLAC files. It remembers where you are in every book, on both devices.
 |---|---|
 | `Packages/AudiobugCore` | Platform-neutral core; `swift test` on the Mac: `InboxSync` + `ICloudFiles` (iCloud Inbox), `PositionStore`, `BookFingerprint` (stable book ids), `AudiobookFormat` (supported files, sniffing), `AudiobookInspector` (title/author/cover/chapters via AVFoundation), `CoverArt` (embedded/sidecar cover, thumbnails) |
 | `Shared/` | Compiled into both apps: `Player` (AVPlayer engine: speed, chapters, sleep timer, interruptions), `NowPlaying` + `RemoteCommands`, `AudioSession`, `Audiobook` + `LibraryScanner`, `CoverStore` + `CoverView` (cover cache, shown everywhere), `Settings`, `SyncMessages` |
-| `App/` | iPhone app: `LibraryStore` (+ Inbox watcher and background import in `InboxAutomation.swift`), `LibraryView`, `PlayerView`, `CoverPicker` (Photos/Files cover menu), `RoutePickerButton`, `WatchLink` (phone side of WatchConnectivity) |
+| `App/` | iPhone app: `LibraryStore` (+ Inbox watcher and background import in `InboxAutomation.swift`), `LibraryView`, `PlayerView`, `CoverPicker` (Photos/Files cover menu), `UploadServer` + `UploadPage` + `UploadServerView` (the Wi-Fi upload web server and its page), `RoutePickerButton`, `WatchLink` (phone side of WatchConnectivity) |
 | `Watch/` | Watch app: `WatchLibrary`, `WatchLink` (receives books), `WatchRootView`, `WatchPlayerView` |
 | `scripts/` | `make-icon.swift` (the icon), `install-iphone.sh`, `run-simulators.sh`, `bump-build.sh`, `release.sh` (GitHub release with a development-signed IPA) |
 | `project.yml` | XcodeGen spec → `Audiobug.xcodeproj` (schemes `Audiobug`, `AudiobugWatch`) |
@@ -75,6 +83,7 @@ UI tests (XCUITest; the simulators need the sample books seeded as `run-simulato
 
 ```sh
 xcodebuild test -scheme Audiobug -destination 'id=<iphone-sim>' -only-testing:AudiobugUITests/AudiobugFlowTests/testPlayerFlow
+xcodebuild test -scheme Audiobug -destination 'id=<iphone-sim>' -only-testing:AudiobugUITests/AudiobugFlowTests/testWiFiUpload
 xcodebuild test -scheme Audiobug -destination 'id=<iphone-sim-paired-with-watch>' -only-testing:AudiobugUITests/AudiobugFlowTests/testSendToWatch
 xcodebuild test -scheme AudiobugWatch -destination 'id=<watch-sim>'
 ```

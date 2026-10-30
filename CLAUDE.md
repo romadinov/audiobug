@@ -35,6 +35,12 @@ Spec: README.md. Sibling projects: `~/Dev/reader` (Scriptorium; the iCloud Inbox
   the Watch as a WC file transfer with metadata `type: cover` — ignore those in book-transfer bookkeeping.
 - On watchOS a plain VStack is not inset by the inline navigation title (only scroll views are); the Watch controls page
   is a ScrollView for that reason.
+- Wi-Fi Upload (`App/Library/UploadServer.swift`): HTTP/1.1 on NWListener, port 8080 or any free one; `GET /` serves
+  `UploadPage.html`, `GET /api/library` JSON, `PUT /upload/<name>?folder=<f>` streams the body to tmp/Uploads and moves it
+  into Documents/Books (409 if `BookFingerprint.id` already in the library, 415 if not an audiobook). Listening needs no
+  local-network permission; Bonjour advertising would (TN3179), so there is none. `HTTPRequestHead` (Core) parses heads.
+  Simulator: `SIMCTL_CHILD_AUDIOBUG_UPLOAD_AUTOSTART=1 xcrun simctl launch …` then curl the Mac's port — note port 8080
+  on this Mac is taken by another process, so the sim server falls back to a random port (`lsof -nP -iTCP -sTCP:LISTEN | grep Audiobug`).
 - Never seed the same M4B twice under different names: book ids are content hashes, so the rows get duplicate ForEach ids.
 
 ## Feedback from the app
