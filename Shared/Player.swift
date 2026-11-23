@@ -63,6 +63,11 @@ final class Player {
     private var sleepTask: Task<Void, Never>?
     private var finished = false
     private let settings = Settings.shared
+    /// Where the seek in flight is going (nil when none): ticks are ignored meanwhile, skips stack on it.
+    private(set) var seekTarget: TimeInterval?
+    private var seekSerial = 0
+    /// Set by the scrubber while the finger is down: remote positions are not applied meanwhile.
+    var isScrubbing = false
 
     init() {
         player.automaticallyWaitsToMinimizeStalling = false
@@ -158,14 +163,27 @@ final class Player {
 
     func toggle() { isPlaying ? pause() : play() }
 
-    func skipForward() { Task { await seek(to: currentTime + settings.skipForward) } }
-    func skipBack() { Task { await seek(to: currentTime - settings.skipBack) } }
+    func skipForward() { skip(by: settings.skipForward) }
+    func skipBack() { skip(by: -settings.skipBack) }
 
-    func seek(to time: TimeInterval, save: Bool = true) async {
+    /// Relative to where the previous skip is heading, so quick repeated taps add up.
+    func skip(by interval: TimeInterval) {
+        let from = seekTarget ?? currentTime
+        Task { await seek(to: from + interval, reason: "skip \(Int(interval))s") }
+    }
+
+    func seek(to time: TimeInterval, save: Bool = true, reason: String = "seek") async {
         let target = min(max(0, time), max(0, duration))
         let was = isPlaying
         finished = false
-        await player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        seekSerial += 1
+        let serial = seekSerial
+        Diag.log("\(reason): \(TimeFormat.clock(target)) (was \(TimeFormat.clock(currentTime)), \(was ? "playing" : "paused"))")
+        seekTarget = target
+        currentTime = target
+        _ = await player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        guard serial == seekSerial else { return }   // a newer seek took over; it finishes the job
+        seekTarget = nil
         currentTime = target
         if was { player.rate = rate }
         if save { savePosition(force: true) }
@@ -182,7 +200,7 @@ final class Player {
 
     // MARK: Chapters
 
-    func jump(to chapter: Chapter) { Task { await seek(to: chapter.start) } }
+    func jump(to chapter: Chapter) { Task { await seek(to: chapter.start, reason: "chapter") } }
 
     func nextChapter() {
         guard let current = currentChapter, let index = chapters.firstIndex(of: current), index + 1 < chapters.count else {
@@ -246,7 +264,7 @@ final class Player {
     // MARK: Positions
 
     private func tick(_ time: CMTime) {
-        guard time.seconds.isFinite, !isLoading else { return }
+        guard time.seconds.isFinite, !isLoading, seekTarget == nil else { return }
         currentTime = time.seconds
         if isPlaying, Date().timeIntervalSince(lastSave) > 5 { savePosition() }
     }
@@ -254,17 +272,23 @@ final class Player {
     func savePosition(force: Bool = false) {
         guard let book, duration > 0 || force else { return }
         lastSave = Date()
+        // Nothing changed since the stored position (typically one applied from the other device): keep its
+        // timestamp. Re-stamping it would send it back as "newest" and make the other device jump to a stale time.
+        if let stored = Positions.shared.position(for: book.id), abs(stored.time - currentTime) < 0.05,
+           stored.finished == finished, stored.rate == rate {
+            return
+        }
         let position = PlaybackPosition(bookID: book.id, time: currentTime, duration: duration > 0 ? duration : nil,
                                         rate: rate, finished: finished, device: DeviceName.current)
         Positions.shared.save(position)
         onPositionSaved?(position)
     }
 
-    /// A newer position arrived from the other device: move there unless we're playing right now.
+    /// A newer position arrived from the other device: move there unless we're playing or seeking right now.
     func apply(remote position: PlaybackPosition) {
-        guard let book, book.id == position.bookID, !isPlaying else { return }
+        guard let book, book.id == position.bookID, !isPlaying, !isScrubbing, seekTarget == nil else { return }
         if let r = position.rate { rate = r; player.defaultRate = r }
-        Task { await seek(to: position.time, save: false) }
+        Task { await seek(to: position.time, save: false, reason: "position from \(position.device)") }
     }
 
     // MARK: Session events

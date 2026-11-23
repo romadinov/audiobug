@@ -60,21 +60,21 @@ enum RemoteCommands {
         center.skipForwardCommand.addTarget { [weak player] event in
             guard let player else { return .commandFailed }
             let interval = (event as? MPSkipIntervalCommandEvent)?.interval ?? settings.skipForward
-            Task { await player.seek(to: player.currentTime + interval) }
+            player.skip(by: interval)
             return .success
         }
         center.skipBackwardCommand.preferredIntervals = [NSNumber(value: settings.skipBack)]
         center.skipBackwardCommand.addTarget { [weak player] event in
             guard let player else { return .commandFailed }
             let interval = (event as? MPSkipIntervalCommandEvent)?.interval ?? settings.skipBack
-            Task { await player.seek(to: player.currentTime - interval) }
+            player.skip(by: -interval)
             return .success
         }
         center.nextTrackCommand.addTarget { [weak player] _ in player?.nextChapter(); return .success }
         center.previousTrackCommand.addTarget { [weak player] _ in player?.previousChapter(); return .success }
         center.changePlaybackPositionCommand.addTarget { [weak player] event in
             guard let player, let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
-            Task { await player.seek(to: event.positionTime) }
+            Task { await player.seek(to: event.positionTime, reason: "remote scrub") }
             return .success
         }
         center.changePlaybackRateCommand.supportedPlaybackRates = Settings.rates.map { NSNumber(value: $0) }

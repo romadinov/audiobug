@@ -142,6 +142,37 @@ final class AudiobugFlowTests: XCTestCase {
         XCTAssertTrue(done.waitForExistence(timeout: 240), "transfer did not finish")
     }
 
+    /// Dragging the scrubber lands where the finger left it and stays there: no bounce back to the old time,
+    /// and repeated skips add up.
+    func testScrubber() throws {
+        let app = XCUIApplication()
+        app.launch()
+        openBook(app, "Old Man's War")
+        app.buttons["player.playPause"].tap()   // pause so the time is steady
+        let slider = app.sliders.firstMatch
+        waitFor(slider)
+        slider.adjust(toNormalizedSliderPosition: 0.6)
+        sleep(1)
+        let atSixty = elapsed(app)
+        slider.adjust(toNormalizedSliderPosition: 0.3)
+        sleep(1)
+        let atThirty = elapsed(app)
+        XCTAssertTrue(atThirty > 0 && atThirty < atSixty, "scrub back: \(atThirty) after \(atSixty)")
+        sleep(2)
+        XCTAssertEqual(elapsed(app), atThirty, "time bounced after the scrub")
+
+        let skipBack = app.buttons["player.skipBack"]
+        skipBack.tap(); skipBack.tap(); skipBack.tap()
+        sleep(1)
+        let afterSkips = elapsed(app)
+        XCTAssertTrue(atThirty - afterSkips >= 40, "three skips back should add up: \(atThirty) → \(afterSkips)")
+
+        app.buttons["player.playPause"].tap()
+        sleep(3)
+        let playing = elapsed(app)
+        XCTAssertTrue(playing >= afterSkips && playing <= afterSkips + 6, "resumed at \(playing), expected ≈ \(afterSkips)")
+    }
+
     /// Switches the Wi-Fi upload server on from the ⋯ menu, reads its address and talks to it over HTTP.
     func testWiFiUpload() throws {
         let app = XCUIApplication()

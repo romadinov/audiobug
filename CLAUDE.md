@@ -21,6 +21,13 @@ Spec: README.md. Sibling projects: `~/Dev/reader` (Scriptorium; the iCloud Inbox
 - `Shared/` must compile for iOS and watchOS: no AVKit/UIKit views there; platform differences go behind `#if os(watchOS)`.
 - Book identity is `BookFingerprint.id` (content hash), never the path — positions and Watch badges key on it.
 - Positions: `Positions.shared` (JSON in Application Support); cross-device merges by `updatedAt`, newest wins.
+  `Player.savePosition` must not re-stamp an unchanged position (one applied from the other device): doing so sent a
+  stale time back as "newest" and the paused device jumped to it. Remote positions are ignored while playing, scrubbing
+  or seeking. Every seek is `Diag.log`ged with its reason, so a reported jump can be traced in the iCloud Diagnostics log.
+- `Slider`'s `onEditingChanged` is unreliable on iOS 26 (can fire `true` again after the drag ends, FB20283439): the
+  scrubber treats every value change as scrubbing and commits the seek itself (350 ms debounce), using the callback only
+  to commit sooner. Seeks are serialised (`seekSerial`/`seekTarget`): ticks are ignored while one is in flight and
+  skips stack on the pending target, so quick repeated taps add up.
 - The Inbox mirrors library folders; never delete a non-empty Inbox folder (see `InboxSync.mirrorDelete`).
 - Text written for the user: address the owner as "you"; never infer pronouns.
 - If the Watch app "installs" in the Watch app and then bounces back to Available Apps, the embedded Watch profile lacks

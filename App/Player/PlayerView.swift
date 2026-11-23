@@ -9,6 +9,7 @@ struct PlayerView: View {
     @Environment(Settings.self) private var settings
     @State private var scrubbing = false
     @State private var scrubTime: TimeInterval = 0
+    @State private var scrubCommit: Task<Void, Never>?
     @State private var showChapters = false
     @State private var outputName = AudioSession.outputName
     @State private var coverRequest: CoverRequest?
@@ -80,17 +81,38 @@ struct PlayerView: View {
             .accessibilityIdentifier("player.cover")
     }
 
+    private func moved(to time: TimeInterval) {
+        scrubTime = time
+        scrubbing = true
+        player.isScrubbing = true
+        scrubCommit?.cancel()
+        scrubCommit = Task {
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            commitScrub()
+        }
+    }
+
+    private func commitScrub() {
+        guard scrubbing else { return }
+        scrubCommit?.cancel()
+        let target = scrubTime
+        Task {
+            await player.seek(to: target, reason: "scrub")
+            guard scrubTime == target else { return }   // moved again meanwhile; that move commits itself
+            scrubbing = false
+            player.isScrubbing = false
+        }
+    }
+
     private var scrubber: some View {
         VStack(spacing: 6) {
-            Slider(value: Binding(get: { shownTime }, set: { scrubTime = $0 }),
+            // The slider's editing callback is not trusted (on iOS 26 it can fire `true` again after the drag ends,
+            // which used to leave the scrubber stuck on the old time and seek back there on the next touch). Every
+            // value change marks scrubbing and schedules the seek; the end callback only commits sooner.
+            Slider(value: Binding(get: { shownTime }, set: { moved(to: $0) }),
                    in: 0...max(1, player.duration)) { editing in
-                if editing {
-                    scrubTime = player.currentTime
-                    scrubbing = true
-                } else {
-                    scrubbing = false
-                    Task { await player.seek(to: scrubTime) }
-                }
+                if !editing { commitScrub() }
             }
             .disabled(!isCurrent || player.isLoading)
             HStack {
